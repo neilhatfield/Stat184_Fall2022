@@ -1,0 +1,125 @@
+---
+title: 'Activity #09 Demo'
+author: "Neil J. Hatfield with James Franklin"
+date: "2022-11-09"
+output: 
+  html_notebook: default
+  pdf_document: default
+geometry: left=0.75in,right=0.75in,top=0.75in,bottom=0.75in
+urlcolor: blue
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = FALSE,
+  warning = FALSE,
+  message = FALSE,
+  fig.align = "center"
+)
+```
+
+```{r loadPackages}
+library(rvest)
+library(dplyr)
+library(readr)
+library(ggplot2)
+library(tidyr)
+
+```
+
+```{r getESPNData}
+espnPSUTables <- read_html(
+  x = "https://www.espn.com/college-football/team/stats/_/id/213/penn-state-nittany-lions"
+) %>%
+  html_elements(css = "table") %>%
+  html_table()
+
+### We will want to use list elements 3 and 4
+```
+
+```{r getPSUData}
+psuFBRoster <- read_html(
+  x = "https://gopsusports.com/sports/football/roster"
+) %>%
+  html_elements(css = "table") %>%
+  html_table()
+
+### We will want to use list element 3
+```
+
+```{r dataWrangling}
+# Bind ESPN tables together
+espnRushing <- bind_cols(espnPSUTables[[3]], espnPSUTables[[4]])
+
+# Clean up ESPN tables by separating player name and position
+# Make yards numeric
+espnRushing <- espnRushing %>%
+  filter(Name != "Total") %>%
+  tidyr::separate(
+    col = Name,
+    into = c("First", "Last", "Position")
+  ) %>%
+  mutate(
+    "Player" = paste(First, Last, sep = " "),
+    .before = First
+  ) %>%
+  mutate(
+    YDS = parse_number(YDS)
+  )
+
+# Extract appropriate player lists
+roster <- psuFBRoster[[3]]
+
+# Clean up extra spaces in player names
+roster <- roster %>%
+  mutate(
+    `Full Name` = stringr::str_squish(`Full Name`)
+  )
+
+## Join the two tables, keeping only those players listed at ESPN AND PSU
+psuRushing <- inner_join(
+  x = espnRushing,
+  y = roster,
+  by = c("Player" = "Full Name", "Position" = "Pos.")
+)
+
+```
+
+```{r dataViz}
+#| fig.cap = "PSU Fall 2022 Rushing Leaders by Player Weight and Position"
+
+ggplot(
+  data = psuRushing,
+  mapping = aes(x = `Wt.`, y = YDS, shape = Position, color = Position)
+) +
+  geom_point(size = 4, na.rm = TRUE) +
+  geom_text(
+    mapping = aes(label = paste0("#",`#`)),
+    color = "black",
+    nudge_y = 30,
+    size = 4,
+    na.rm = TRUE
+  ) +
+  theme_bw() +
+  xlab("Player weight (lbs)") +
+  ylab("Total rushing yards") +
+  # ggtitle("Total Rushing Yards by PSU Player Weight and Position") +
+  theme(
+    text = element_text(size = 12)
+  )
+
+```
+
+Please type narrative here.
+
+```{r trackdown, eval=FALSE}
+library(trackdown)
+upload_file(
+  file = "Activity09Demo.Rmd",
+  hide_code = TRUE,
+  rich_text = TRUE,
+  path_output = "Activity09Demo.pdf"
+)
+```
+
+
